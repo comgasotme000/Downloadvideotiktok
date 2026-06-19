@@ -1,6 +1,3 @@
-// ==========================================
-// PHẦN 1: MÁY CHỦ XỬ LÝ (BACKEND)
-// ==========================================
 const express = require('express');
 const axios = require('axios');
 
@@ -8,17 +5,15 @@ const app = express();
 const PORT = 3000;
 
 app.get('/download-tiktok', async (req, res) => {
-    // Lấy link video người dùng dán vào ô nhập liệu
     const videoUrl = req.query.url;
     if (!videoUrl) {
         return res.json({ success: false, error: 'Vui lòng điền link video!' });
     }
 
-    // Cấu hình chìa khóa gửi lên hệ thống RapidAPI của bạn
     const options = {
         method: 'GET',
         url: 'https://tiktok-video-downloader-api.p.rapidapi.com/media', 
-        params: { videoUrl: videoUrl }, // Truyền link video vào tham số videoUrl theo đúng ảnh image_2e40db.png
+        params: { videoUrl: videoUrl }, 
         headers: {
             'X-RapidAPI-Key': 'd2bf749cd0mshcb70d0663e484e6p1d104djsnfcec42eabd7b',
             'X-RapidAPI-Host': 'tiktok-video-downloader-api.p.rapidapi.com'
@@ -27,19 +22,24 @@ app.get('/download-tiktok', async (req, res) => {
 
     try {
         const response = await axios.request(options);
+        console.log("DỮ LIỆU API TRẢ VỀ:", JSON.stringify(response.data)); // In ra terminal để kiểm tra cấu trúc nếu lỗi
         
-        // Trích xuất link tải video sạch từ kết quả API trả về
         let cleanVideoUrl = '';
-        if (response.data && response.data.data) {
-            cleanVideoUrl = response.data.data.play || response.data.data.wmplay;
-        } else if (response.data) {
-            cleanVideoUrl = response.data.videoUrl || response.data.url;
+        
+        // Kiểm tra tất cả các trường hợp có thể chứa link video không logo của API này
+        if (response.data) {
+            if (response.data.data) {
+                cleanVideoUrl = response.data.data.play || response.data.data.hdplay || response.data.data.wmplay;
+            }
+            if (!cleanVideoUrl) {
+                cleanVideoUrl = response.data.videoUrl || response.data.url || response.data.nowatermark || response.data.download_url;
+            }
         }
         
         if (cleanVideoUrl) {
             res.json({ success: true, videoUrl: cleanVideoUrl });
         } else {
-            res.json({ success: false, error: 'Không tìm thấy link video sạch trong kết quả trả về.' });
+            res.json({ success: false, error: 'Không tìm thấy link video sạch. Hãy kiểm tra Log trên Render.' });
         }
     } catch (error) {
         console.error(error);
@@ -47,7 +47,6 @@ app.get('/download-tiktok', async (req, res) => {
     }
 });
 
-// Trả về giao diện người dùng khi truy cập vào trang web
 app.get('/', (req, res) => {
     res.send(`
         <!DOCTYPE html>
@@ -115,9 +114,6 @@ app.get('/', (req, res) => {
     `);
 });
 
-// Khởi động cổng chạy trang web
 app.listen(process.env.PORT || PORT, () => {
-    console.log('=============== THÀNH CÔNG ===============');
     console.log('Trang web đang chạy thành công!');
-    console.log('==========================================');
 });
