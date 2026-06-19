@@ -7,18 +7,18 @@ const axios = require('axios');
 const app = express();
 const PORT = 3000;
 
-// Đường dẫn xử lý khi người dùng bấm nút "Bắt Đầu Lấy Video"
 app.get('/download-tiktok', async (req, res) => {
+    // Lấy link video người dùng dán vào ô nhập liệu
     const videoUrl = req.query.url;
     if (!videoUrl) {
         return res.json({ success: false, error: 'Vui lòng điền link video!' });
     }
 
-    // CẤU HÌNH KHỚP CHÍNH XÁC THEO ẢNH MỚI CỦA BẠN
+    // Cấu hình chìa khóa gửi lên hệ thống RapidAPI của bạn
     const options = {
         method: 'GET',
-        url: 'https://tiktok-video-downloader-api.p.rapidapi.com/media', // Đã đổi thành /media theo ảnh của bạn
-        params: { videoUrl: videoUrl }, // Đổi tên param thành videoUrl theo chuẩn của API này
+        url: 'https://tiktok-video-downloader-api.p.rapidapi.com/media', 
+        params: { videoUrl: videoUrl }, // Truyền link video vào tham số videoUrl theo đúng ảnh image_2e40db.png
         headers: {
             'X-RapidAPI-Key': 'd2bf749cd0mshcb70d0663e484e6p1d104djsnfcec42eabd7b',
             'X-RapidAPI-Host': 'tiktok-video-downloader-api.p.rapidapi.com'
@@ -28,9 +28,13 @@ app.get('/download-tiktok', async (req, res) => {
     try {
         const response = await axios.request(options);
         
-        // Trích xuất link video không logo từ kết quả API trả về
-        // API này thường trả về link ở mục response.data.data.play hoặc response.data.videoUrl
-        const cleanVideoUrl = response.data.data ? response.data.data.play : (response.data.videoUrl || response.data.url);
+        // Trích xuất link tải video sạch từ kết quả API trả về
+        let cleanVideoUrl = '';
+        if (response.data && response.data.data) {
+            cleanVideoUrl = response.data.data.play || response.data.data.wmplay;
+        } else if (response.data) {
+            cleanVideoUrl = response.data.videoUrl || response.data.url;
+        }
         
         if (cleanVideoUrl) {
             res.json({ success: true, videoUrl: cleanVideoUrl });
@@ -112,7 +116,6 @@ app.get('/', (req, res) => {
 });
 
 // Khởi động cổng chạy trang web
-// Khởi động cổng chạy trang web (Sửa lại để thích nghi với Render)
 app.listen(process.env.PORT || PORT, () => {
     console.log('=============== THÀNH CÔNG ===============');
     console.log('Trang web đang chạy thành công!');
