@@ -4,6 +4,36 @@ const axios = require('axios');
 const app = express();
 const PORT = 3000;
 
+// Hàm quét tự động tìm link video trong mọi ngóc ngách của dữ liệu JSON
+function findVideoUrl(obj) {
+    if (!obj) return null;
+    
+    // Nếu là chuỗi, kiểm tra xem có phải là link video không
+    if (typeof obj === 'string') {
+        if (obj.startsWith('http') && (obj.includes('tiktokcdn') || obj.includes('.mp4') || obj.includes('video') || obj.includes('play'))) {
+            return obj;
+        }
+    }
+    
+    // Nếu là đối tượng hoặc mảng, tiếp tục quét sâu vào bên trong
+    if (typeof obj === 'object') {
+        for (let key in obj) {
+            if (obj.hasOwnProperty(key)) {
+                // Ưu tiên các ô có tên gợi nhớ đến video trước
+                if (['play', 'hdplay', 'video_output', 'url', 'download_url', 'wmplay', 'video'].includes(key)) {
+                    if (typeof obj[key] === 'string' && obj[key].startsWith('http')) {
+                        return obj[key];
+                    }
+                }
+                // Quét đệ quy sâu hơn
+                let result = findVideoUrl(obj[key]);
+                if (result) return result;
+            }
+        }
+    }
+    return null;
+}
+
 app.get('/download-tiktok', async (req, res) => {
     const videoUrl = req.query.url;
     if (!videoUrl) {
@@ -22,30 +52,36 @@ app.get('/download-tiktok', async (req, res) => {
 
     try {
         const response = await axios.request(options);
-        let cleanVideoUrl = '';
         
-        if (response.data) {
-            // Đọc đúng cấu trúc tầng chứa link video dựa trên dữ liệu thực tế trả về
-            const d = response.data;
-            
-            // Ép hệ thống quét lấy link video chuẩn không logo hoặc có logo tùy theo ô trả về
-            cleanVideoUrl = d.video_output || d.url || d.videoUrl || d.download_url || d.play;
-            
-            // Nếu nằm trong cụm data con
-            if (!cleanVideoUrl && d.data) {
-                cleanVideoUrl = d.data.video_output || d.data.play || d.data.url || d.data.hdplay;
+        // Kích hoạt bộ quét sâu tự động tìm link
+        let cleanVideoUrl = findVideoUrl(response.data);
+        
+        // Nếu quét sâu bằng từ khóa đặc biệt không ra, lấy link bất kỳ miễn là không phải ảnh đại diện
+        if (!cleanVideoUrl && response.data) {
+            const JSON_STRING = JSON.stringify(response.data);
+            const urls = JSON_STRING.match(/"(https?:\/\/[^"]+)"/g);
+            if (urls) {
+                for (let u of urls) {
+                    let cleanUrl = u.replace(/"/g, '');
+                    if (!cleanUrl.includes('.jpeg') && !cleanUrl.includes('.jpg') && !cleanUrl.includes('.png') && !cleanUrl.includes('avatar')) {
+                        cleanVideoUrl = cleanUrl;
+                        break;
+                    }
+                }
             }
         }
         
         if (cleanVideoUrl) {
             res.json({ success: true, videoUrl: cleanVideoUrl });
         } else {
-            // Nếu quét tất cả vẫn hụt, trả về link dự phòng từ cấu trúc thô của API
-            res.json({ success: false, error: 'Không thể bóc tách link. Hãy thử lại với video khác!' });
+            res.json({ 
+                success: false, 
+                error: 'Không tìm thấy link video. Dữ liệu thô nhận được từ API là: ' + JSON.stringify(response.data) 
+            });
         }
     } catch (error) {
         console.error(error);
-        res.json({ success: false, error: 'Lỗi kết nối tới hệ thống API.' });
+        res.json({ success: false, error: 'Lỗi kết nối tới hệ thống API hoặc link lỗi.' });
     }
 });
 
