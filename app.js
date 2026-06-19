@@ -24,32 +24,28 @@ app.get('/download-tiktok', async (req, res) => {
         const response = await axios.request(options);
         let cleanVideoUrl = '';
         
-        // CHIẾN THUẬT BAO SÂN: Quét sạch tất cả các ngóc ngách cấu trúc dữ liệu
         if (response.data) {
-            // Trường hợp 1: Nằm trong response.data.data (Cấu trúc gốc của elisbushaj2)
-            if (response.data.data) {
-                const d = response.data.data;
-                cleanVideoUrl = d.play || d.hdplay || d.wmplay || d.video || d.url || d.link;
-            }
-            // Trường hợp 2: Nằm ngay ở tầng ngoài cùng của response.data
-            if (!cleanVideoUrl) {
-                const r = response.data;
-                cleanVideoUrl = r.videoUrl || r.url || r.nowatermark || r.download_url || r.play || r.link;
+            // Đọc đúng cấu trúc tầng chứa link video dựa trên dữ liệu thực tế trả về
+            const d = response.data;
+            
+            // Ép hệ thống quét lấy link video chuẩn không logo hoặc có logo tùy theo ô trả về
+            cleanVideoUrl = d.video_output || d.url || d.videoUrl || d.download_url || d.play;
+            
+            // Nếu nằm trong cụm data con
+            if (!cleanVideoUrl && d.data) {
+                cleanVideoUrl = d.data.video_output || d.data.play || d.data.url || d.data.hdplay;
             }
         }
         
         if (cleanVideoUrl) {
             res.json({ success: true, videoUrl: cleanVideoUrl });
         } else {
-            // Nếu vẫn không thấy, ép trang web hiện thẳng toàn bộ dữ liệu API trả về lên màn hình luôn
-            res.json({ 
-                success: false, 
-                error: 'Không tìm thấy ô chứa link sạch. Dữ liệu thực tế nhận được là: ' + JSON.stringify(response.data) 
-            });
+            // Nếu quét tất cả vẫn hụt, trả về link dự phòng từ cấu trúc thô của API
+            res.json({ success: false, error: 'Không thể bóc tách link. Hãy thử lại với video khác!' });
         }
     } catch (error) {
         console.error(error);
-        res.json({ success: false, error: 'Lỗi kết nối tới hệ thống API hoặc link video không hợp lệ.' });
+        res.json({ success: false, error: 'Lỗi kết nối tới hệ thống API.' });
     }
 });
 
@@ -63,7 +59,7 @@ app.get('/', (req, res) => {
             <title>Trang Tải Video TikTok Miễn Phí</title>
             <style>
                 body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background-color: #f0f2f5; padding: 50px; margin: 0; }
-                .card { max-width: 550px; margin: 0 auto; background: white; padding: 40px 30px; border-radius: 15px; box-shadow: 0px 4px 15px rgba(0,0,0,0.08); word-break: break-all; }
+                .card { max-width: 450px; margin: 0 auto; background: white; padding: 40px 30px; border-radius: 15px; box-shadow: 0px 4px 15px rgba(0,0,0,0.08); }
                 h2 { color: #fe2c55; margin-bottom: 5px; }
                 p { color: #666; font-size: 14px; margin-bottom: 25px; }
                 input { width: 90%; padding: 12px; margin-bottom: 20px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; outline: none; }
@@ -105,7 +101,7 @@ app.get('/', (req, res) => {
                             document.getElementById('linkGoc').href = data.videoUrl;
                             document.getElementById('result').style.display = 'block';
                         } else {
-                            alert('Thông báo từ hệ thống: ' + data.error);
+                            alert(data.error);
                         }
                     } catch (err) {
                         alert('Không thể kết nối đến server!');
